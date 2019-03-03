@@ -32,6 +32,49 @@ char* keywords[NUM_KEYWORDS] = {
 	"else"
 };
 
+void removeComments(char *testCaseFile, char *cleanFile){
+	FILE* fp_dirty = fopen(testCaseFile, "r");
+	FILE* fp_clean = fopen(cleanFile, "w+");
+	char buf[BUF_SIZE], buf_write[BUF_SIZE];
+	int i, j, read;
+	int fl = 0;
+	while(!feof(fp_dirty)){
+		memset(buf_write, '\0', BUF_SIZE);
+		read = 0;
+		if((read = fread(buf, sizeof(char), BUF_SIZE, fp_dirty)) == -1){
+			printf("Error occurred while reading");
+			break;
+		}
+		j = 0;
+		for(i = 0; i < read; i++){
+			if(buf[i] == '%'){
+				fl++;
+				continue;
+			}
+			else if(buf[i] == '\n'){
+				buf_write[j] = buf[i];
+				j++;
+				fl--;
+				continue;
+			}
+			else if(fl == 1){
+				continue;
+			}
+			else{
+				buf_write[j] = buf[i];
+				j++;
+			}
+		}
+		if(fwrite(buf_write, sizeof(char), j, fp_clean) == -1){
+			printf("Error ocurred while writing");
+			break;
+		}
+	}
+	fclose(fp_dirty);
+	fclose(fp_clean);
+	return;
+}
+
 FILE* getStream(FILE *fp){
 	int read;
 	char *temp = current_buffer;
