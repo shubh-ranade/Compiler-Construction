@@ -1,16 +1,72 @@
+#ifndef _PARSEDEF_
+#define _PARSEDEF_
 
 #include "lexerDef.h"
-typedef enum{program,otherFunctions,mainFunction,stmts,function,input_par,output_par,parameter_list,dataType,remaining_list,dataType,primitiveDatatype,constructedDatatype,typeDefinitions,declarations,otherStmts,returnStmt,typeDefinition
 
+#define TOTAL_NUM_NT 51
+#define RULE_COUNT 92
+
+typedef enum{
+	program,
+	mainFunction,
+	otherFunctions,
+	function,
+	input_par,
+	output_par,
+	parameter_list,
+	dataType,
+	remaining_list,
+	primitiveDatatype,
+	constructedDatatype,
+	stmts,
+	typeDefinitions,
+	typeDefinition,
+	fieldDefinitions,
+	fieldDefinition,
+	moreFields,
+	declarations,
+	declaration,
+	global_or_not,
+	otherStmts,
+	stmt,
+	assignmentStmt,
+	singleOrRecId,
+	new24,
+	funCallStmt,
+	outputParameters,
+	inputParameters,
+	iterativeStmt,
+	conditionalStmt,
+	elsePart,
+	ioStmt,
+	allVar,
+	newVar,
+	arithmeticExpression,
+	expPrime,
+	term,
+	termPrime,
+	factor,
+	highPrecedenceOperators,
+	lowPrecedenceOperators,
+	all,
+	temp,
+	booleanExpression,
+	var,
+	logicalOp,
+	relationalOp,
+	returnStmt,
+	optionalReturn,
+	idList,
+	more_ids
 }TK_NTTYPES;
 
 typedef union
 {
-	TK_TYPES term;
-	TK_NTTYPES nonterm;
+	TK_TYPES term_type;
+	TK_NTTYPES nonterm_type;
 }grSymbol;
 
-typedef enum{term, non_term} tnt_tag;
+typedef enum{TERM, NON_TERM} tnt_tag;
 
 typedef struct grNode{
 	tnt_tag t;
@@ -19,6 +75,10 @@ typedef struct grNode{
 }* GrNode;
 
 typedef struct grHead{
-	grSymbol s;
+	TK_NTTYPES nonterm_head;
 	GrNode first;
 }* GrHead;
+
+typedef GrHead Grammar;
+
+#endif
