@@ -1,8 +1,17 @@
+/*
+GROUP NUMBER: 45
+GROUP MEMBERS:
+	1. SHAH NEEL KAUSHIK
+	2. MEHTA AASHAY PINKESH
+	3. RANADE SHUBHANKAR PRASAD
+*/
+
 #include"lexerDef.h"
 
-char *current_buffer, *previous_buffer, *curr_pos;
+char current_buffer[BUF_SIZE+1];
+char *curr_pos = current_buffer;
 FILE* fp;
-int line_no = 0;
+int line_no = 1, is_file_over = 0;
 extern HashTable ht;
 
 char* keywords[NUM_KEYWORDS] = {
@@ -31,6 +40,34 @@ char* keywords[NUM_KEYWORDS] = {
 	"endrecord",
 	"else"
 };
+
+FILE* getStream(FILE *fp){
+
+	if(is_file_over==1)
+	{
+		rewind(fp);
+		is_file_over = 0;
+		line_no = 0;
+		return NULL;
+	}
+	int read;
+	
+	//clear current buffer before reading into it
+	memset(current_buffer, 0, BUF_SIZE + 1);
+
+	read = fread(current_buffer, sizeof(char), BUF_SIZE, fp);
+	if (read<BUF_SIZE)
+	{	
+		is_file_over=1;
+		// fclose(fp);
+		rewind(fp);
+		// fseek(fp, 0, SEEK_SET);
+	}
+
+	curr_pos = current_buffer;
+
+	return fp;
+}
 
 void removeComments(char *testCaseFile, char *cleanFile){
 	FILE* fp_dirty = fopen(testCaseFile, "r");
@@ -75,52 +112,54 @@ void removeComments(char *testCaseFile, char *cleanFile){
 	return;
 }
 
-FILE* getStream(FILE *fp){
-	int read;
-	char *temp = current_buffer;
-	current_buffer = previous_buffer;
-	previous_buffer = temp;
-	
-	//clear current buffer before reading into it
-	memset(current_buffer, 0, sizeof(current_buffer));
+void print_lex_error(char *value, int type_of_error){
 
-	if (feof(fp)){
-		fclose(fp);
-		return NULL;
+	/*type_of_error = 0: unrecognised symbol
+	                  1: wrong pattern
+	                  2: lexeme length limit exceeded for id/recordid
+	                  3: lexeme length limit exceeded for funid
+	*/
+	if(type_of_error == 0){
+		printf("Line %d: Unknown Symbol %s\n", line_no, value);
+		return;
 	}
-	
-	//loading data from file
-	read = fread(current_buffer, sizeof(char), BUF_SIZE, fp);
-	
-	if(read <= 0){
-		// printf("Read error in buffer 1!");
-		fclose(fp);
-		return NULL;
+	else if(type_of_error == 1){
+		printf("Line %d: Unknown pattern %s\n", line_no, value);
+		return;
 	}
-
-	current_buffer[BUF_SIZE] = '\0';
-
-	return fp;
+	else if(type_of_error == 2){
+		printf("Line %d: Identifier is longer than the prescribed length of 20 characters\n", line_no);
+		return;
+	}
+	else if(type_of_error == 3){
+		printf("Line %d: Identifier is longer than the prescribed length of 30 characters\n", line_no);
+		return;
+	}
+	else if(type_of_error == 4){
+		printf("Line %d: Number is too long\n", line_no);
+	}
 }
 
-
-
 tokenInfo getNextToken(FILE *fp){
-	if(*current_buffer == '\0'){
+	
+	tokenInfo tk_eof;
+	tk_eof.type_of_token = NOT_KEYWORD;
+	tk_eof.line_num = line_no;
+
+	char *ch = curr_pos;
+	if(*curr_pos == '\0'){
 		fp = getStream(fp);
+		if(fp == NULL)
+			return tk_eof;
+		ch = current_buffer;
+		curr_pos = ch;
 	}
 
 	tokenInfo tk_info;
-	// memset(tk_info.value, 0, sizeof(tk_info.value));
-	tk_info.type_of_token = -2;
+	tk_info.type_of_token = NOT_TOKEN;
 	tk_info.line_num = line_no;
 
-	tokenInfo tk_eof;
-	tk_eof.type_of_token = -1;
-	tk_eof.line_num = line_no;
-
 	int state = 0, vind = 0;
-	char *ch = curr_pos;
 	char value[MAX_FLOAT_LEN + 1];
 
 	while(1){
@@ -138,6 +177,7 @@ tokenInfo getNextToken(FILE *fp){
 				//resetting value
 				memset(value, 0, MAX_LEXEME_SIZE);
 				vind = 0;
+				value[vind++]=*ch;
 
 				switch(*ch){
 					case '-':
@@ -181,33 +221,23 @@ tokenInfo getNextToken(FILE *fp){
 						break;
 
 					case '#':
-						value[vind] = *ch;
-						vind++;
 						state = 20;
 						break;
 
 					case '0' ... '9':
-						value[vind] = *ch;
-						vind++;
 						state = 23;
 						break;
 
 					case '_':
-						value[vind] = *ch;
-						vind++;
 						state = 28;
 						break;
 
 					case 'b' ... 'd':
-						value[vind] = *ch;
-						vind++;
 						state = 34;
 						break;
 
 					case 'a':
 					case 'e' ... 'z':
-						value[vind] = *ch;
-						vind++;
 						state = 32;
 						break;
 
@@ -216,6 +246,7 @@ tokenInfo getNextToken(FILE *fp){
 						break;
 
 					case '\n':
+					case '\r':
 						line_no++;
 						break;
 
@@ -255,35 +286,54 @@ tokenInfo getNextToken(FILE *fp){
 						state = 54;
 						break;
 
-					default:
+					case ' ':
+					case '\t':
 						state = 0;
-				}
+						break;					
 
+					default:
+						// value[vind++] = *ch;
+						value[vind] = '\0';
+						ch++;
+						curr_pos = ch;
+						print_lex_error(value, 0);
+						tk_info.type_of_token = UNK_SYMB;
+						tk_info.line_num = line_no;
+						return tk_info;
+				}
 				break;
 
 			case 1:
 				tk_info.type_of_token = TK_MINUS;
-				tk_info.line_num = line_no;
+				tk_info.line_num = line_no;			
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 2:
 				tk_info.type_of_token = TK_MUL;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 3:
 				tk_info.type_of_token = TK_NOT;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 4:
 				if(*ch == '='){
 					state = 5;
+					value[vind++]=*ch;
 				}
-				else{
+				else{					
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;
 				}
 				break;
@@ -292,55 +342,72 @@ tokenInfo getNextToken(FILE *fp){
 				tk_info.type_of_token = TK_NE;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 6:
 				tk_info.type_of_token = TK_COLON;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 7:
 				tk_info.type_of_token = TK_SQL;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 8:
 				tk_info.type_of_token = TK_SQR;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 9:											//also state 10 (retract)
 				if(*ch == '='){
+					value[vind++] = *ch;
 					state = 14;
 				}
 				else if(*ch == '-'){
+					value[vind++] = *ch;
 					state = 11;
 				}
 				else{
 					tk_info.type_of_token = TK_LT;
-					tk_info.line_num = line_no;
-					curr_pos = ch;							//See what I did there?
+					tk_info.line_num = line_no;					
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;
 				}
 				break;							
 
 			case 11:
 				if(*ch == '-'){
+					value[vind++] = *ch;
 					state = 12;
 				}
 				else{
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;
 				}
 				break;
 
-			case 12:
+			case 12:			
 				if(*ch == '-'){
+					value[vind++] = *ch;
 					state = 13;
 				}
-				else{
+				else{					
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;
 				}
 				break;
@@ -349,19 +416,26 @@ tokenInfo getNextToken(FILE *fp){
 				tk_info.type_of_token = TK_ASSIGNOP;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 14:
 				tk_info.type_of_token = TK_LE;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
-			case 15:
+			case 15:				
 				if(*ch == '='){
+					value[vind++] = *ch;
 					state = 16;
 				}
 				else{
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;
 				}
 				break;
@@ -370,22 +444,33 @@ tokenInfo getNextToken(FILE *fp){
 				tk_info.type_of_token = TK_EQ;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
-			case 17:
+			case 17:				
 				if(*ch == '&'){
+					value[vind++] = *ch;
 					state = 18;
 				}
 				else{
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;
 				}
 				break;
 
-			case 18:
+			case 18:				
 				if(*ch == '&'){
+					value[vind++] = *ch;
 					state = 19;
 				}
 				else{
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;
 				}
 				break;
@@ -396,13 +481,16 @@ tokenInfo getNextToken(FILE *fp){
 				curr_pos = ch;
 				return tk_info;
 
-			case 20:
+			case 20:				
 				if(*ch >= 'a' && *ch <= 'z'){
-					value[vind] = *ch;
-					vind++;
+					value[vind++] = *ch;
 					state = 21;
 				}
 				else{
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;
 				}
 				break;
@@ -419,6 +507,10 @@ tokenInfo getNextToken(FILE *fp){
 							curr_pos = ch;
 						}
 					}
+					value[19] = '\0';
+					print_lex_error(value, 2);
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
+					curr_pos = ch;
 					return tk_info;
 				}
 				else if(*ch >= 'a' && *ch <= 'z'){
@@ -431,7 +523,7 @@ tokenInfo getNextToken(FILE *fp){
 					tk_info.type_of_token = TK_RECORDID;
 					tk_info.line_num = line_no;
 					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
-					curr_pos = ch;										//See? I did it again
+					curr_pos = ch;
 					return tk_info;
 				}										
 				break;			
@@ -442,7 +534,7 @@ tokenInfo getNextToken(FILE *fp){
 					vind++;
 				}
 				else if(vind >= 39){
-					while(*ch >= '0' && *ch <= '9'){
+					while((*ch >= '0' && *ch <= '9') || *ch == '.'){
 						ch++;
 						if(*ch == '\0'){
 							fp = getStream(fp);
@@ -452,6 +544,12 @@ tokenInfo getNextToken(FILE *fp){
 							curr_pos = ch;
 						}
 					}
+					value[39] = '\0';
+					print_lex_error(value, 4);
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
+					tk_info.type_of_token = TK_NUM;
+					tk_info.line_num = line_no;
+					curr_pos = ch;
 					return tk_info;
 				}
 				else if(*ch == '.'){
@@ -459,24 +557,20 @@ tokenInfo getNextToken(FILE *fp){
 					vind++;
 					state = 24;
 				}
-				else if (vind >= 10){
-					while(*ch >= '0' && *ch <= '9'){
-						ch++;
-						if(*ch == '\0'){
-							fp = getStream(fp);
-							if(fp == NULL)
-								return tk_eof;
-							ch = current_buffer;
-							curr_pos = ch;
-						}
-					}
+				else if (vind >= 10){					
+					value[11] = '\0';
+					print_lex_error(value, 4);
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
+					tk_info.type_of_token = TK_NUM;
+					tk_info.line_num = line_no;
+					curr_pos = ch;
 					return tk_info;
 				}
 				else{
 					tk_info.type_of_token = TK_NUM;
 					tk_info.line_num = line_no;
 					strncpy(tk_info.value, value, MAX_FLOAT_LEN);					
-					curr_pos = ch;										//See? I did it again
+					curr_pos = ch;
 					return tk_info;
 				}
 				break;
@@ -487,7 +581,11 @@ tokenInfo getNextToken(FILE *fp){
 					vind++;
 					state = 25;
 				}
-				else{
+				else{					
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
+					curr_pos = ch;
 					return tk_info;
 				}
 				break;
@@ -499,6 +597,10 @@ tokenInfo getNextToken(FILE *fp){
 					state = 26;
 				}
 				else{
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;
 				}
 				break;
@@ -515,6 +617,12 @@ tokenInfo getNextToken(FILE *fp){
 							curr_pos = ch;
 						}
 					}
+					value[MAX_FLOAT_LEN] = '\0';
+					print_lex_error(value, 4);
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
+					tk_info.type_of_token = TK_RNUM;
+					tk_info.line_num = line_no;
+					curr_pos = ch;
 					return tk_info;
 				}
 				else if(vind <= MAX_FLOAT_LEN){
@@ -525,6 +633,10 @@ tokenInfo getNextToken(FILE *fp){
 					return tk_info;
 				}
 				else{
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;					
 				}
 				break;
@@ -535,12 +647,16 @@ tokenInfo getNextToken(FILE *fp){
 					state = 29;
 				}
 				else{
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;					
 				}
 				break;
 
-			case 29:
-				if((*ch >= 'a' && *ch <= 'z') || (*ch >= 'A' && *ch <= 'Z') && vind >= MAX_LEXEME_SIZE){
+			case 29:												//also state 31 (retract state)
+				if(((*ch >= 'a' && *ch <= 'z') || (*ch >= 'A' && *ch <= 'Z')) && vind >= MAX_LEXEME_SIZE){
 					while((*ch >= 'a' && *ch <= 'z') || (*ch >= 'A' && *ch <= 'Z') || (*ch >= '0' && *ch <= '9')){
 						ch++;
 						if(*ch == '\0'){
@@ -551,6 +667,12 @@ tokenInfo getNextToken(FILE *fp){
 							curr_pos = ch;
 						}
 					}
+					value[MAX_LEXEME_SIZE] = '\0';
+					print_lex_error(value, 3);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
+					tk_info.type_of_token = TK_FUNID;
+					tk_info.line_num = line_no;
 					return tk_info;
 				}
 				else if ((*ch >= 'a' && *ch <= 'z') || (*ch >= 'A' && *ch <= 'Z')){
@@ -560,7 +682,21 @@ tokenInfo getNextToken(FILE *fp){
 					value[vind++] = *ch;
 					state = 30;
 				}
+				else if(vind <= MAX_LEXEME_SIZE){
+					tk_info.type_of_token = findKeyword(ht, value);
+					tk_info.line_num = line_no;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
+					curr_pos = ch;
+					if(tk_info.type_of_token == NOT_KEYWORD){
+						tk_info.type_of_token = TK_FUNID;
+					}
+					return tk_info;
+				}
 				else {
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;
 				}
 				break;
@@ -577,6 +713,12 @@ tokenInfo getNextToken(FILE *fp){
 							curr_pos = ch;
 						}
 					}
+					value[MAX_LEXEME_SIZE] = '\0';
+					print_lex_error(value, 3);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
+					tk_info.type_of_token = TK_FUNID;
+					tk_info.line_num = line_no;
 					return tk_info;
 				}
 				else if(*ch >= '0' && *ch <= '9'){
@@ -587,12 +729,16 @@ tokenInfo getNextToken(FILE *fp){
 					tk_info.line_num = line_no;
 					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					curr_pos = ch;
-					if(tk_info.type_of_token == -1){
+					if(tk_info.type_of_token == NOT_KEYWORD){
 						tk_info.type_of_token = TK_FUNID;
 					}
 					return tk_info;
 				}
 				else{
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
+					curr_pos = ch;
 					return tk_info;
 				}
 				break;
@@ -609,6 +755,11 @@ tokenInfo getNextToken(FILE *fp){
 							curr_pos = ch;
 						}
 					}
+					value[20] = '\0';
+					print_lex_error(value, 2);
+					curr_pos = ch;
+					tk_info.type_of_token = TK_FIELDID;
+					tk_info.line_num = line_no;
 					return tk_info;
 				}
 				else if(*ch >= 'a' && *ch <= 'z'){
@@ -619,12 +770,16 @@ tokenInfo getNextToken(FILE *fp){
 					tk_info.line_num = line_no;
 					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					curr_pos = ch;
-					if(tk_info.type_of_token == -1){
+					if(tk_info.type_of_token == NOT_KEYWORD){
 						tk_info.type_of_token = TK_FIELDID;
 					}
 					return tk_info;
 				}
 				else{
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
+					curr_pos = ch;
 					return tk_info;
 				}
 				break;
@@ -639,6 +794,10 @@ tokenInfo getNextToken(FILE *fp){
 					value[vind++] = *ch;
 				}
 				else{
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
+					curr_pos = ch;
 					return tk_info;
 				}
 				break;
@@ -673,6 +832,12 @@ tokenInfo getNextToken(FILE *fp){
 							curr_pos = ch;
 						}
 					}
+					value[20] = '\0';
+					print_lex_error(value, 2);
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
+					curr_pos = ch;
+					tk_info.type_of_token = TK_ID;
+					tk_info.line_num = line_no;
 					return tk_info;
 				}
 				else if(*ch >= 'b' && *ch <= 'd'){
@@ -690,6 +855,10 @@ tokenInfo getNextToken(FILE *fp){
 					return tk_info;
 				}
 				else{
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
+					curr_pos = ch;
 					return tk_info;
 				}
 				break;
@@ -706,6 +875,12 @@ tokenInfo getNextToken(FILE *fp){
 							curr_pos = ch;
 						}
 					}
+					value[20] = '\0';
+					print_lex_error(value, 2);
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
+					curr_pos = ch;
+					tk_info.type_of_token = TK_ID;
+					tk_info.line_num = line_no;
 					return tk_info;
 				}
 				else if(*ch >= '2' && *ch <= '7'){					
@@ -719,24 +894,38 @@ tokenInfo getNextToken(FILE *fp){
 					return tk_info;
 				}
 				else{
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;					
 				}
 				break;
 
 			case 39:
 				if(*ch == '@'){
+					value[vind++] = *ch;
 					state = 40;
 				}
 				else{
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;
 				}
 				break;
 
 			case 40:
 				if(*ch == '@'){
+					value[vind++] = *ch;
 					state = 41;
 				}
 				else{
+					value[vind] = '\0';
+					print_lex_error(value, 1);
+					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;
 				}
 				break;
@@ -745,10 +934,11 @@ tokenInfo getNextToken(FILE *fp){
 				tk_info.type_of_token = TK_OR;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 43:
-				while(*ch != '\n'){
+				while(*ch != '\n' && *ch != '\r'){
 					ch++;
 					if(*ch == '\0'){
 						fp = getStream(fp);
@@ -764,12 +954,14 @@ tokenInfo getNextToken(FILE *fp){
 
 			case 45:
 				if(*ch == '='){
+					value[vind++] = *ch;
 					state = 47;
 				}
 				else{
 					tk_info.type_of_token = TK_GT;
 					tk_info.line_num = line_no;
 					curr_pos = ch;
+					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					return tk_info;
 				}
 				break;
@@ -778,48 +970,56 @@ tokenInfo getNextToken(FILE *fp){
 				tk_info.type_of_token = TK_GE;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 48:
 				tk_info.type_of_token = TK_CL;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 49:
 				tk_info.type_of_token = TK_OP;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 50:
 				tk_info.type_of_token = TK_SEM;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 51:
 				tk_info.type_of_token = TK_COMMA;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 52:
 				tk_info.type_of_token = TK_DOT;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 53:
 				tk_info.type_of_token = TK_DIV;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 
 			case 54:
 				tk_info.type_of_token = TK_PLUS;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				return tk_info;
 		}
 		ch++;

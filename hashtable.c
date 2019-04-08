@@ -1,3 +1,10 @@
+/*
+GROUP NUMBER: 45
+GROUP MEMBERS:
+	1. SHAH NEEL KAUSHIK
+	2. MEHTA AASHAY PINKESH
+	3. RANADE SHUBHANKAR PRASAD
+*/
 
 #include "lexerDef.h"
 
@@ -100,4 +107,19 @@ void addKeyword(HashTable ht, char* key, TK_TYPES type_of_token)
 	return;
 }
 
-
+void freeHashTable()
+{
+	int i;
+	Node temp,prev;
+	for(i=0;i<HT_SIZE;i++)
+	{
+		temp=ht[i].next;
+		while(temp!=NULL)
+		{
+			prev=temp;
+			temp=prev->next;
+			free(prev);
+		}
+	}
+	free(ht);
+}

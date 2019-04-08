@@ -1,3 +1,11 @@
+/*
+GROUP NUMBER: 45
+GROUP MEMBERS:
+	1. SHAH NEEL KAUSHIK
+	2. MEHTA AASHAY PINKESH
+	3. RANADE SHUBHANKAR PRASAD
+*/
+
 #ifndef _PARSEDEF_
 #define _PARSEDEF_
 
@@ -72,11 +80,13 @@ typedef struct grNode{
 	tnt_tag t;
 	grSymbol s;
 	struct grNode* next;
+	struct grNode* prev;
 }* GrNode;
 
 typedef struct grHead{
 	TK_NTTYPES nonterm_head;
 	GrNode first;
+	GrNode last;
 }* GrHead;
 
 typedef GrHead Grammar;

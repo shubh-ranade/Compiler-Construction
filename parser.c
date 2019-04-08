@@ -1,12 +1,23 @@
+/*
+GROUP NUMBER: 45
+GROUP MEMBERS:
+	1. SHAH NEEL KAUSHIK
+	2. MEHTA AASHAY PINKESH
+	3. RANADE SHUBHANKAR PRASAD
+*/
+
 #include "lexerDef.h"
 #include "lexer.h"
 #include "parserDef.h"
+#include "stackTree.h"
 
 int size_of_first_set[TOTAL_NUM_NT];
 int size_of_follow_set[TOTAL_NUM_NT];
 TK_TYPES first[TOTAL_NUM_NT][20];
 TK_TYPES follow[TOTAL_NUM_NT][20];
 int is_visited_node[TOTAL_NUM_NT];
+int ParseTable[TOTAL_NUM_NT][TOTAL_NUM_TOKENS];
+int goes_to_eps[TOTAL_NUM_NT];
 
 char *map_terminals_to_strings[TOTAL_NUM_TOKENS] = {
 	"TK_ASSIGNOP",
@@ -124,7 +135,6 @@ struct grHead gram_rules[RULE_COUNT];
 
 int find(char *str, int t_or_nt){
 
-	// printf("Inside find\n");
 	int i;
 	if(t_or_nt){
 		for(i = 0; i < TOTAL_NUM_NT; i++){
@@ -143,20 +153,20 @@ int find(char *str, int t_or_nt){
 
 void insertAtEnd(GrNode node, int rule_index){
 
-	// printf("Inside insertAtEnd\n");
 	GrNode temp = gram_rules[rule_index].first;
 	if(temp == NULL){
 		gram_rules[rule_index].first = node;
+		gram_rules[rule_index].last=node;
 		return;
 	}
 
-	// temp = gram_rules[rule_index].first->next;
-	// printf("entering while\n");
 	while(temp->next != NULL)
+	{	
 		temp = temp->next;
-
+	}
 	temp->next = node;
-	// printf("returning\n");
+	node->prev=temp;
+	gram_rules[rule_index].last=node;
 	return;
 }
 
@@ -167,13 +177,10 @@ void loadGrammar()
 	char *ch;
 	char gline[100];
 	char tnt[50];
-
-	// printf("Inside loadGrammar\n");
 	
 	for(i = 0; i < RULE_COUNT; i++)
 	{
 		fgets(gline,100,fp);
-		// printf("gline = %s\n", gline);
 		ch = gline;
 		j = 0;
 		while(*ch != ' ')
@@ -188,6 +195,7 @@ void loadGrammar()
 		int nt_index = find(tnt, 1);
 		gram_rules[i].nonterm_head = nt_index;
 		gram_rules[i].first = NULL;
+		gram_rules[i].last=NULL;
 
 		while(*ch != '>')
 			ch++;
@@ -197,7 +205,6 @@ void loadGrammar()
 		{
 			if(*ch >= 'a' && *ch <= 'z')
 			{
-				//ch++;
 				j=0;
 				while(*ch != ' ' && *ch != '\n' && *ch != '\r')
 				{
@@ -215,9 +222,9 @@ void loadGrammar()
 					nt_node->t = 1;
 					nt_node->s.nonterm_type = find(tnt, 1);
 					nt_node->next = NULL;
+					nt_node->prev=NULL;
 					//insert this node in the linkedlist corresponding to ith rule
 					insertAtEnd(nt_node, i);
-					// printf("tnt = %s find(tnt, 1) = %d\n", tnt, find(tnt, 1));
 				}
 				else
 				{
@@ -225,6 +232,7 @@ void loadGrammar()
 					t_node->t = 0;
 					t_node->s.term_type = find(tnt, 0);
 					t_node->next = NULL;
+					t_node->prev=NULL;
 
 					//insert this node in the linkedlist corresponding to ith rule
 					insertAtEnd(t_node, i);
@@ -248,6 +256,7 @@ void loadGrammar()
 				t_node->t = 0;
 				t_node->s.term_type = find(tnt, 0);
 				t_node->next = NULL;
+				t_node->prev=NULL;
 
 				//insert this node in the linkedlist corresponding to ith rule
 				insertAtEnd(t_node, i);
@@ -258,230 +267,526 @@ void loadGrammar()
 		}
 
 	}
-	/*printf("gram_rules[0].nonterm_head = %d\n", gram_rules[0].nonterm_head);
-	printf("gram_rules[0].nonterm_head = %d\n", gram_rules[0].first->s.nonterm_type);
-	printf("gram_rules[0].nonterm_head = %d\n", gram_rules[0].first->next->s.nonterm_type);*/
 	fclose(fp);
 	return;
 
 }
 
 
+void freeGrammar()
+{
+	int i;
+	GrNode temp;
+	for(i=0;i<RULE_COUNT;i++)
+	{
+		temp=gram_rules[i].first;
+		while(temp->next!=NULL)
+		{
+			temp=temp->next;
+			free(temp->prev);
+			temp->prev=NULL;
+		}
+		free(temp);
+	}
+}
 
 //--------------------------------------------------------------------------------------------------------------------------
 
 
-void addFirst(TK_TYPES q, int ind)
+void addToFirstSet(TK_TYPES ter, int index)
 {
-	int i;
-	for(i=0; i < size_of_first_set[ind]; i++)
+	int i=0;
+	while(i < size_of_first_set[index])
 	{
-		if(first[ind][i] == q)
+		if(first[index][i] == ter)
 		{
 			break;
 		}
+		i++;
 	}
-	if(i == size_of_first_set[ind])
+
+	if(i == size_of_first_set[index])
 	{
-		first[ind][size_of_first_set[ind]] = q;
-		size_of_first_set[ind]++;
+		first[index][size_of_first_set[index]] = ter;
+		size_of_first_set[index]++;
 	}
+	return;
 }
 
-void addFollow(TK_TYPES q, int ind)
+void addToFollowSet(TK_TYPES ter, int index)
 {
-	int i;
-	for(i=0;i < size_of_follow_set[ind]; i++)
+	int i=0;
+	while(i < size_of_follow_set[index])
 	{
-		if(follow[ind][i] == q)
+		if(follow[index][i] == ter)
 		{
 			break;
 		}
+		i++;
 	}
-	if(i == size_of_follow_set[ind])
+
+	if(i == size_of_follow_set[index])
 	{
-		follow[ind][size_of_follow_set[ind]] = q;
-		size_of_follow_set[ind]++;
+		follow[index][size_of_follow_set[index]] = ter;
+		size_of_follow_set[index]++;
 	}
+	return;
 }
 
-void dfs(TK_NTTYPES node)
+void search(TK_NTTYPES nonter)
 {
-	if(is_visited_node[node])
+	if(is_visited_node[nonter])
 	{
 		return;
 	}
-	int i, j;
-	for(i = 0; i < RULE_COUNT; i++)
+	int i=0, j;
+	while(i < RULE_COUNT)
 	{
-		if(gram_rules[i].nonterm_head == node)
+		if(gram_rules[i].nonterm_head == nonter)
 		{
-			GrNode cur = gram_rules[i].first;
+			GrNode current = gram_rules[i].first;
 			while(1)
 			{
-				if(cur->t == TERM)
+				if(current->t == TERM)
 				{
-					addFirst(cur->s.nonterm_type, node);
+					addToFirstSet(current->s.nonterm_type, nonter);
+					if(current->s.term_type == TK_EPS){
+						goes_to_eps[nonter] = 1;
+					}
 					break;
 				}
-				dfs(cur->s.nonterm_type);
-				int nul = 0;
-				int q = cur->s.nonterm_type;
-				for(j = 0; ; j++)
+				search(current->s.nonterm_type);
+				int epsilon = 0;
+				int p = current->s.nonterm_type;
+				j=0;
+				while(1)
 				{
-					if (first[q][j] == -1)
+					if (first[p][j] == -1)
 					{
 						break;
 					}
-					if(strcmp(map_terminals_to_strings[first[q][j]],"eps")==0)
+					if(strcmp(map_terminals_to_strings[first[p][j]],"eps")!=0)
 					{
-						nul = 1;
+						addToFirstSet(first[p][j], nonter);
 					}
 					else
 					{
-						addFirst(first[q][j], node);
-					}	
-				}
-				if(nul == 1)
-				{
-					cur = cur->next;
-					if(cur == NULL)
-					{
-						addFirst(TK_EPS,node);
-						break;
+						epsilon = 1;
 					}
+					j++;	
 				}
-				else
+				if(epsilon == 0)
 				{
 					break;
 				}
+				else
+				{
+					current = current->next;
+					if(current == NULL)
+					{
+						addToFirstSet(TK_EPS,nonter);
+						break;
+					}
+				}
 			}		
 		}
+		i++;
 	}
-	is_visited_node[(int)node] = 1;
+	is_visited_node[nonter] = 1;
 }
 
 void computeFirstSet()
 {
-	int i, j;
-	for(i = 0; i < TOTAL_NUM_NT; i++)
+	int i=0, j;
+	for(int k = 0; k < TOTAL_NUM_NT; k++){
+		goes_to_eps[k] = 0;
+	}
+	while(i < TOTAL_NUM_NT)
 	{
 		size_of_first_set[i] = 0;
 		is_visited_node[i] = 0;
-		for(j = 0; j < 20; ++j)
+		j=0;
+		while(j < 20)
 		{
 			first[i][j] = -1;
+			j++;
 		}
-	}	
-	for(i = 0; i < RULE_COUNT; i++)
-	{
-		TK_NTTYPES tmp=gram_rules[i].nonterm_head;
-		if(!is_visited_node[tmp])
-		{
-			dfs(tmp);
-			is_visited_node[tmp] = 1;
-		}
+		i++;
 	}
-	// printf("FIRST : \n");
-	// for(i = 0; i < TSIZE; ++i)
-	// {
-	// 	printf("%s : ", nonterminal_map[i]);
-	// 	for(j = 0; j < 20; ++j)
-	// 	{
-	// 		if (first[i][j] == -1)
-	// 		{
-	// 			break;
-	// 		}
-	// 		printf("%s ", token[first[i][j]]);
-	// 	}
-	// 	printf("\n");
-	// }
+
+	i=0;	
+	while(i < RULE_COUNT)
+	{
+		TK_NTTYPES nonter=gram_rules[i].nonterm_head;
+		if(!is_visited_node[nonter])
+		{
+			search(nonter);
+			is_visited_node[nonter] = 1;
+		}
+		i++;
+	}
 }
 
 void computeFollowSet()
 {
-	int i, j, k;
-	for(i = 0; i < TOTAL_NUM_NT; i++)
+	int i=0, j, k;
+	while(i < TOTAL_NUM_NT)
 	{
 		size_of_follow_set[i] = 0;
-		for(j = 0; j < 20; ++j)
+		j=0;
+		while(j < 20)
 		{
 			follow[i][j] = -1;
+			j++;
 		}
+		i++;
 	}
-	addFollow(TK_DOL, 0);
-	for(k = 0; k < 2; ++k)
+	addToFollowSet(TK_DOL, 0);
+
+	for(k = 0; k < 2; k++)
 	{
-		for(i = 0; i < RULE_COUNT; ++i)
+		i=0;
+		while(i < RULE_COUNT)
 		{
-			GrNode cur = gram_rules[i].first, nxt;
-			TK_NTTYPES par = gram_rules[i].nonterm_head;
-			while(cur != NULL)
+			GrNode current = gram_rules[i].first, temp;
+			TK_NTTYPES parent = gram_rules[i].nonterm_head;
+			while(current != NULL)
 			{
-				if(cur->t == TERM)
+				if(current->t == TERM)
 				{
-					cur = cur->next;
+					current = current->next;
 				}
 				else
 				{
-					nxt = cur->next;
-					while(nxt != NULL)
+					temp = current->next;
+					while(temp != NULL)
 					{
-						if(nxt->t == TERM)
+						if(temp->t == NON_TERM)
 						{
-							addFollow(nxt->s.term_type, cur->s.nonterm_type);
-							break;
-						}
-						else
-						{
-							int flg = 0;
-							int q = (int)(nxt->s.nonterm_type);
-							for(j = 0; j < size_of_first_set[q]; j++)
+							int epsilon = 0;
+							int p = temp->s.nonterm_type;
+							j=0;
+							while(j < size_of_first_set[p])
 							{
-								if(strcmp(map_terminals_to_strings[first[q][j]], "eps") == 0)
+								if(strcmp(map_terminals_to_strings[first[p][j]], "eps") != 0)
 								{
-									flg=1;
+									addToFollowSet(first[p][j],current->s.nonterm_type);
 								}
 								else
 								{
-									addFollow(first[q][j],cur->s.nonterm_type);
+									epsilon=1;
 								}	
+								j++;
 							}
-							if(!flg)
+
+							if(epsilon)
 							{
-								break;
+								temp=temp->next;
 							}
 							else
 							{
-								nxt=nxt->next;
+								break;
 							}
+						}
+						else
+						{	
+							addToFollowSet(temp->s.term_type, current->s.nonterm_type);
+							break;
 						}	
 					}
-					if(nxt == NULL)
+					if(temp == NULL)
 					{
-						int q = par;
-						for(j = 0; j < size_of_follow_set[q]; j++)
+						int p = parent;
+						
+						j=0;
+						while(j < size_of_follow_set[p])
 						{
-							addFollow(follow[q][j],(cur->s.nonterm_type));
+							addToFollowSet(follow[p][j],current->s.nonterm_type);
+							j++;
 						}
 					}
-					cur = cur->next;
+					current = current->next;
 				}
+			}
+			i++;
+		}
+	}
+}
+
+void createParsingTable(){
+
+	int i, j, k, flag;
+	GrNode temp;
+	for(i = 0; i < TOTAL_NUM_NT; i++){
+		for(j = 0; j < TOTAL_NUM_TOKENS; j++){
+			ParseTable[i][j] = -1;
+		}
+	}
+	for(i = 0; i < RULE_COUNT; i++){
+		temp = gram_rules[i].first;
+		while(temp != NULL){
+			flag = 0;
+			if(temp->t == TERM){
+				if(temp->s.term_type!=TK_EPS)
+				{	
+					ParseTable[gram_rules[i].nonterm_head][temp->s.term_type] = i;
+					break;
+				}
+				else
+				{
+					k = 0;
+					while(follow[gram_rules[i].nonterm_head][k] != -1)
+					{
+						ParseTable[gram_rules[i].nonterm_head][follow[gram_rules[i].nonterm_head][k]] = i;
+						k++;
+					}
+					break;
+				}	
+			}
+			else{
+				j = 0;
+				while(first[temp->s.nonterm_type][j] != -1){
+					if(first[temp->s.nonterm_type][j] != TK_EPS){
+						ParseTable[gram_rules[i].nonterm_head][first[temp->s.nonterm_type][j]] = i;
+					}
+					else{
+						flag++;
+					}
+					j++;
+				}
+			}
+			if(!flag){
+				break;
+			}
+			temp = temp->next;
+		}
+		if(temp == NULL){
+			k = 0;
+			while(follow[gram_rules[i].nonterm_head][k] != -1){
+				ParseTable[gram_rules[i].nonterm_head][follow[gram_rules[i].nonterm_head][k]] = i;
+				k++;
 			}
 		}
 	}
-	// printf("FOLLOW : \n");
-	// for(i = 0; i < TSIZE; ++i)
-	// {
-	// 	printf("%s : ", nonterminal_map[i]);
-	// 	for(j = 0; j < 20; ++j)
-	// 	{
-	// 		if (follow[i][j] == -1)
-	// 		{
-	// 			break;
-	// 		}
-	// 		printf("%s ", token[follow[i][j]]);
-	// 	}
-	// 	printf("\n");
-	// }
+}
+
+void printParseTable(){
+	int i, j;
+	for(i = 0; i < TOTAL_NUM_NT; i++){
+		for(j = 0; j < TOTAL_NUM_TOKENS; j++){
+			printf("%d ", ParseTable[i][j]);
+		}
+		printf("\n");
+	}
+}
+
+void printTree(TreeNode root, FILE** outfile)
+{
+	if(root==NULL)
+		return;
+	printTree(root->child, outfile);
+	AttNode gramnode=root->grammar_node;
+	if(gramnode->t==TERM){
+		if(gramnode->s.term_type == TK_EPS){
+			return;
+		}
+		if(gramnode->s.term_type == TK_NUM || gramnode->s.term_type == TK_RNUM){
+			fprintf(*outfile,"%43s%43d%43s%43s%43s%43s%43s\n", root->value, root->line, map_terminals_to_strings[gramnode->s.term_type], root->value, map_nonterminals_to_strings[root->parent->grammar_node->s.nonterm_type], "yes", "----");
+		}
+		else{
+			fprintf(*outfile,"%43s%43d%43s%43s%43s%43s%43s\n", root->value, root->line, map_terminals_to_strings[gramnode->s.term_type], "----", map_nonterminals_to_strings[root->parent->grammar_node->s.nonterm_type], "yes", "----");
+		}
+	}
+	else{
+		if(root->parent != NULL){
+			fprintf(*outfile,"%43s%43s%43s%43s%43s%43s%43s\n", "----", "----", "----", "----", map_nonterminals_to_strings[root->parent->grammar_node->s.nonterm_type], "no", map_nonterminals_to_strings[gramnode->s.nonterm_type]);
+		}
+		else{
+			fprintf(*outfile,"%43s%43s%43s%43s%43s%43s%43s\n", "----", "----", "----", "----", "ROOT", "no", map_nonterminals_to_strings[gramnode->s.nonterm_type]);
+		}
+	}
+
+	if(root->child!=NULL)
+	{
+		TreeNode temp=root->child->right;
+		while(temp!=NULL){
+			printTree(temp, outfile);
+			temp = temp->right;
+		}
+	}
+	return;
+}
+
+
+void freeParseTree(TreeNode root)
+{
+	if(root==NULL)
+		return;
+	freeParseTree(root->child);
+	freeParseTree(root->right);
+	free(root->grammar_node);
+	free(root);
+	return;
+}
+
+TreeNode parse(FILE *fp){
+	//initailize stack
+	Stack pStack = newStack();
+	//push dollar and start symbol
+	//make attNode
+	AttNode dollarNode = (AttNode) malloc(sizeof(struct attNode));
+	dollarNode->t = TERM;
+	dollarNode->s.term_type = TK_DOL;
+
+	AttNode startNode = (AttNode) malloc(sizeof(struct attNode));
+	startNode->t = NON_TERM;
+	startNode->s.nonterm_type = program;
+
+	//push
+	StackNode dnode=createNode(dollarNode);
+	StackNode snode=createNode(startNode);
+
+	pStack = push(dnode, pStack);
+	pStack = push(snode, pStack);
+	tokenInfo token;
+	StackNode tstack, push_node;
+	token=getNextToken(fp);
+	int rule,j, no_compilation_errors = 1;
+	GrNode temp;
+
+	while(1)
+	{
+		tstack=top(pStack);
+
+		pStack=pop(pStack);
+		if(token.type_of_token==NOT_KEYWORD)
+		{
+			if(tstack->grammar_node->t==TERM)
+			{
+				if(tstack->grammar_node->s.term_type==TK_DOL)
+				{
+					if(no_compilation_errors){
+						printf("compiled successfully\n");
+					}
+					else{
+						printf("Compilation unsuccessful, errors found\n");
+					}					
+					break;
+				}		
+			}
+			printf("Line %d: file ended unexpectedly\n",token.line_num);
+		}
+
+		if(tstack->grammar_node->t==TERM)
+		{
+			if(tstack->grammar_node->s.term_type==TK_EPS)
+				continue;
+			
+			
+			if(tstack->grammar_node->s.term_type==TK_DOL)
+			{
+				printf("Line %d: Extra tokens occurring after main function\n",token.line_num);
+				no_compilation_errors = 0;
+				break;
+			}
+			if(token.type_of_token==tstack->grammar_node->s.term_type)
+			{
+				strncpy(tstack->value, token.value, MAX_FLOAT_LEN);
+				tstack->line = token.line_num;
+				token=getNextToken(fp);
+
+				while(token.type_of_token == UNK_SYMB){
+					no_compilation_errors = 0;
+					token = getNextToken(fp);
+				}
+
+				while(token.type_of_token==NOT_TOKEN)
+				{
+					no_compilation_errors = 0;			
+					// pStack = pop(pStack);
+					token=getNextToken(fp);
+				}
+				continue;
+			}
+			else
+			{
+				if(tstack->grammar_node->s.term_type==TK_SEM){
+					no_compilation_errors = 0;
+					printf("Line %d: Semicolon missing\n", token.line_num-1);
+				}
+				else
+				{	
+					no_compilation_errors = 0;
+					printf("Line %d: The token %s for lexeme %s does not match with the expected token %s\n",token.line_num,map_terminals_to_strings[token.type_of_token],token.value,map_terminals_to_strings[tstack->grammar_node->s.term_type]);
+				}
+			}
+		}
+		else
+		{
+			TK_NTTYPES index = tstack->grammar_node->s.nonterm_type;
+			rule=ParseTable[index][token.type_of_token];
+			if(rule==-1)
+			{
+				no_compilation_errors = 0;
+				for(j=0;j<size_of_follow_set[index];j++)
+				{
+					if(token.type_of_token==follow[index][j])
+					{
+						printf("Line %d: The token %s for lexeme %s does not match with the expected token of type <%s>\n",token.line_num,map_terminals_to_strings[token.type_of_token],token.value,map_nonterminals_to_strings[index]);
+						break;
+					}
+				}
+				if(j==size_of_follow_set[index])
+				{	
+					
+					if(!goes_to_eps[index]){
+						printf("Line %d: The token %s for lexeme %s does not match with the expected token of type <%s>\n",token.line_num,map_terminals_to_strings[token.type_of_token],token.value,map_nonterminals_to_strings[index]);
+						token=getNextToken(fp);
+					}
+					else{
+						continue;
+					}					
+					
+					while(token.type_of_token == UNK_SYMB){
+						token = getNextToken(fp);
+					}
+
+					while(token.type_of_token==NOT_TOKEN)
+					{
+						pStack = pop(pStack);
+						token=getNextToken(fp);
+					}
+				}
+			}
+			else
+			{
+				temp=gram_rules[rule].last;
+				TreeNode previous=NULL;
+				while(temp!=NULL)
+				{
+					AttNode anode=(AttNode)malloc(sizeof(struct attNode));
+					anode->t=temp->t;
+					if(temp->t==TERM)
+					{
+						anode->s.term_type=temp->s.term_type;
+					}
+					else
+					{
+						anode->s.nonterm_type=temp->s.nonterm_type;
+					}
+					push_node=createNode(anode);
+					push_node->parent=tstack;
+					push_node->right=previous;
+					push(push_node,pStack);
+					previous=push_node;
+					temp = temp -> prev;
+				}
+				tstack->child=previous;
+			}
+		}
+	}
+	free(dollarNode);
+	free(dnode);
+	free(pStack);
+	return snode;
 }

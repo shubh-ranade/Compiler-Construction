@@ -1,3 +1,11 @@
+/*
+GROUP NUMBER: 45
+GROUP MEMBERS:
+	1. SHAH NEEL KAUSHIK
+	2. MEHTA AASHAY PINKESH
+	3. RANADE SHUBHANKAR PRASAD
+*/
+
 #ifndef _LEXDEF_
 #define _LEXDEF_
 
@@ -6,8 +14,8 @@
 #include <fcntl.h>
 #include <string.h>
 
-#define TOTAL_NUM_TOKENS 53	//number of token classes
-#define BUF_SIZE 512		//size of buffer
+#define TOTAL_NUM_TOKENS 55	//number of token classes
+#define BUF_SIZE 1024		//size of buffer
 #define MAX_LEXEME_SIZE 30	//maximum length of lexeme
 #define NUM_KEYWORDS 24		//number of keywords
 #define MAX_KEYWORD_SIZE 11	//maximum length of keyword
@@ -70,22 +78,19 @@ typedef enum{
 	TK_GT,
 	TK_GE,
 	TK_NE,
-	NOT_KEYWORD = -1,
-	NOT_TOKEN = -2
+	TK_EPS,
+	TK_DOL,
+	NOT_KEYWORD,			//for eof
+	NOT_TOKEN,				//erraneous token
+	UNK_SYMB
 }TK_TYPES;
-/*
-typedef union{
-	char var_name[MAX_LEXEME_SIZE];
-	int int_num;
-	float real_num;
-}lexeme;
-*/
+
 typedef struct lexeme* Lexeme;
 
 typedef struct {
 	TK_TYPES type_of_token;
 	int line_num;
-	char value[MAX_LEXEME_SIZE];
+	char value[MAX_FLOAT_LEN];
 }tokenInfo; 
 
 
@@ -111,5 +116,5 @@ HashTable initializeHashTable();
 void addKeyword(HashTable ht, char* key, TK_TYPES type_of_token);
 int hash(char* key);
 TK_TYPES findKeyword(HashTable ht, char* key);
-
+void freeHashTable();
 #endif
