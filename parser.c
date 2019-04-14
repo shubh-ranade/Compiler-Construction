@@ -650,6 +650,8 @@ TreeNode parse(FILE *fp){
 	pStack = push(snode, pStack);
 	tokenInfo token;
 	StackNode tstack, push_node;
+	
+	//call to get the first token and start parsing
 	token=getNextToken(fp);
 	int rule,j, no_compilation_errors = 1;
 	GrNode temp;
@@ -666,7 +668,7 @@ TreeNode parse(FILE *fp){
 				if(tstack->grammar_node->s.term_type==TK_DOL)
 				{
 					if(no_compilation_errors){
-						printf("compiled successfully\n");
+						printf("Compiled successfully.\n");
 					}
 					else{
 						printf("Compilation unsuccessful, errors found\n");
@@ -728,9 +730,14 @@ TreeNode parse(FILE *fp){
 			if(rule==-1)
 			{
 				no_compilation_errors = 0;
-				for(j=0;j<size_of_follow_set[index];j++)
+				if(token.type_of_token == TK_SEM){
+					pStack = pop(pStack);
+					token = getNextToken(fp);
+					continue;
+				}
+				for(j = 0;j < size_of_follow_set[index]; j++)
 				{
-					if(token.type_of_token==follow[index][j])
+					if(token.type_of_token == follow[index][j])
 					{
 						printf("Line %d: The token %s for lexeme %s does not match with the expected token of type <%s>\n",token.line_num,map_terminals_to_strings[token.type_of_token],token.value,map_nonterminals_to_strings[index]);
 						break;
@@ -760,11 +767,12 @@ TreeNode parse(FILE *fp){
 			}
 			else
 			{
-				temp=gram_rules[rule].last;
+				temp = gram_rules[rule].last;
+				tstack->rule_id = rule;
 				TreeNode previous=NULL;
 				while(temp!=NULL)
 				{
-					AttNode anode=(AttNode)malloc(sizeof(struct attNode));
+					AttNode anode = (AttNode)malloc(sizeof(struct attNode));
 					anode->t=temp->t;
 					if(temp->t==TERM)
 					{

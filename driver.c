@@ -10,9 +10,11 @@ GROUP MEMBERS:
 #include "lexer.h"
 #include "parser.h"
 #include "stackTree.h"
+#include "parserDef.h"
 #include <time.h>
 
 extern HashTable ht;
+extern char *map_terminals_to_strings[TOTAL_NUM_TOKENS];
 
 //Reads <filename> and prints all lexemes along with their respective line numbers
 void printTokens(FILE *fp){
@@ -21,7 +23,11 @@ void printTokens(FILE *fp){
 		if(token.type_of_token == NOT_KEYWORD){
 			break;
 		}
-		printf("Line %d: Lexeme = %s\n", token.line_num, token.value);		
+		if(token.type_of_token == NOT_TOKEN || token.type_of_token == UNK_SYMB){
+			// printf("--------------->\n");
+			continue;
+		}
+		printf("Line %d: Token Name: %-15s Lexeme = %s\n", token.line_num, map_terminals_to_strings[token.type_of_token], token.value);		
 	}
 }
 
@@ -93,6 +99,19 @@ int main(int argc, char *argv[]){
 			    total_CPU_time  =  (double) (end_time - start_time);
 			    total_CPU_time_in_seconds =   total_CPU_time / CLOCKS_PER_SEC;
 			    printf("time taken = %fs, ticks = %f\n", total_CPU_time_in_seconds, total_CPU_time);
+				break;
+
+			case 5:
+				loadGrammar();
+				computeFirstSet();
+				computeFollowSet();
+				createParsingTable();
+				root = parse(fp);
+				printTree(root, &outfile);
+				createAst(root);
+				AstNode astRoot = root->addr;
+				freeParseTree(root);
+				printAst(astRoot);
 				break;
 
 			//Default case to handle all other options

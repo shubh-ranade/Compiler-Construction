@@ -108,7 +108,7 @@ typedef struct{
 }htentry;
 
 
-typedef struct tokenInfo* TokenInfo;
+typedef tokenInfo* TokenInfo;
 typedef htentry* HashTable;
 
 //hashtable fuctions

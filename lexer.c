@@ -88,7 +88,7 @@ void removeComments(char *testCaseFile, char *cleanFile){
 				fl++;
 				continue;
 			}
-			else if(buf[i] == '\n'){
+			else if(buf[i] == '\n' && fl){
 				buf_write[j] = buf[i];
 				j++;
 				fl--;
@@ -476,6 +476,7 @@ tokenInfo getNextToken(FILE *fp){
 				break;
 
 			case 19:
+				strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 				tk_info.type_of_token = TK_AND;
 				tk_info.line_num = line_no;
 				curr_pos = ch;
@@ -547,7 +548,7 @@ tokenInfo getNextToken(FILE *fp){
 					value[39] = '\0';
 					print_lex_error(value, 4);
 					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
-					tk_info.type_of_token = TK_NUM;
+					// tk_info.type_of_token = TK_NUM;
 					tk_info.line_num = line_no;
 					curr_pos = ch;
 					return tk_info;
@@ -620,7 +621,7 @@ tokenInfo getNextToken(FILE *fp){
 					value[MAX_FLOAT_LEN] = '\0';
 					print_lex_error(value, 4);
 					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
-					tk_info.type_of_token = TK_RNUM;
+					// tk_info.type_of_token = TK_RNUM;
 					tk_info.line_num = line_no;
 					curr_pos = ch;
 					return tk_info;
@@ -671,7 +672,7 @@ tokenInfo getNextToken(FILE *fp){
 					print_lex_error(value, 3);
 					curr_pos = ch;
 					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
-					tk_info.type_of_token = TK_FUNID;
+					// tk_info.type_of_token = TK_FUNID;
 					tk_info.line_num = line_no;
 					return tk_info;
 				}
@@ -717,7 +718,7 @@ tokenInfo getNextToken(FILE *fp){
 					print_lex_error(value, 3);
 					curr_pos = ch;
 					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
-					tk_info.type_of_token = TK_FUNID;
+					// tk_info.type_of_token = TK_FUNID;
 					tk_info.line_num = line_no;
 					return tk_info;
 				}
@@ -758,7 +759,7 @@ tokenInfo getNextToken(FILE *fp){
 					value[20] = '\0';
 					print_lex_error(value, 2);
 					curr_pos = ch;
-					tk_info.type_of_token = TK_FIELDID;
+					// tk_info.type_of_token = TK_FIELDID;
 					tk_info.line_num = line_no;
 					return tk_info;
 				}
@@ -836,7 +837,6 @@ tokenInfo getNextToken(FILE *fp){
 					print_lex_error(value, 2);
 					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					curr_pos = ch;
-					tk_info.type_of_token = TK_ID;
 					tk_info.line_num = line_no;
 					return tk_info;
 				}
@@ -879,7 +879,7 @@ tokenInfo getNextToken(FILE *fp){
 					print_lex_error(value, 2);
 					strncpy(tk_info.value, value, MAX_FLOAT_LEN);
 					curr_pos = ch;
-					tk_info.type_of_token = TK_ID;
+					// tk_info.type_of_token = TK_ID;
 					tk_info.line_num = line_no;
 					return tk_info;
 				}

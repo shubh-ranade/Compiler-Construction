@@ -34,6 +34,10 @@ StackNode createNode(AttNode grammar_node)
 	stNode->parent=NULL;
 	stNode->right=NULL;
 	stNode->child=NULL;
+	stNode->inh=NULL;
+	stNode->syn=NULL;
+	stNode->addr=NULL;
+	stNode->rule_id = -2;
 	return stNode;
 }
 

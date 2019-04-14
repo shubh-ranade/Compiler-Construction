@@ -13,6 +13,31 @@ GROUP MEMBERS:
 #include "lexer.h"
 #include "parserDef.h"
 
+//these two structures are used in ast
+typedef enum {intType, realType, recordType, errType} varTypes;
+
+typedef struct typeList{
+	struct typeList* next;
+	varTypes vtype;
+	char fieldName[MAX_LEXEME_SIZE + 1];
+}* TypeList;
+
+
+typedef struct astNode{
+    struct astNode *parent;
+    struct astNode *right;
+    struct astNode *child;
+	//struct astNode *last; //last node of linked list for a construct
+    //int offset;
+    grSymbol s;
+   	char value[MAX_FLOAT_LEN+1];
+    tnt_tag t;
+    //varTypes vtype;
+	TypeList tlist;
+    int globalFlg; //global flag, 0 init 1 means global
+	int line_number;
+} *AstNode;
+
 typedef struct attNode{
 	tnt_tag t;
 	grSymbol s;
@@ -26,6 +51,10 @@ typedef struct stackNode{
 	struct stackNode* child;
 	char value[MAX_FLOAT_LEN+1];
 	int line;
+
+	//for ast construction
+	AstNode inh, syn, addr;
+	int rule_id; // default value is -2, follows 0 based indexing
 } *StackNode;
 
 typedef struct stack{
@@ -44,4 +73,14 @@ StackNode top(Stack st);
 int isEmpty(Stack st);
 StackNode createNode(AttNode grammar_node);
 
+//ast helper function
+AstNode createAstNode(TreeNode t);
+
+//creat ast
+void createAst(TreeNode root);
+
+//print ast
+void printAst(AstNode root);
+
+TypeList createTypeList(varTypes vtype);
 #endif
